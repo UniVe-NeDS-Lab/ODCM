@@ -1,7 +1,9 @@
 import networkx as nx
 
+from misc import copy_graph
 
-def get_topology_generator(gw_strategy_name, topology_strategy_name):
+
+def get_topology_generator(gw_strategy_name: str, topology_strategy_name: str):
     # Get class using string as classname
     gw_strategy = globals()[gw_strategy_name]
     topology_strategy = globals()[topology_strategy_name]
@@ -34,13 +36,29 @@ class SimpleBackhaul(Backhaul):
 
 class MultiGWBackhaul(Backhaul):
     def extract_graph(self):
-        self.select_gateway(3)
+        self.select_gateways(3)
         self.phig = nx.Graph()
         for gw in self.gateways[:3]:
             p = nx.shortest_path(self.vg, gw)
             for path in p.values():
                 for i in range(len(path)-1):
                     self.phig.add_edge(path[i], path[i+1])
+
+
+class MultiGWBackhaulDisjoint(Backhaul):
+    def extract_graph(self):
+        self.select_gateways(3)
+        self.phig = nx.Graph()
+        myvg = copy_graph(self.vg)
+        for gw in self.gateways[:3]:
+            p = nx.shortest_path(myvg, gw)
+            for path in p.values():
+                for i in range(len(path)-1):
+                    self.phig.add_edge(path[i], path[i+1])
+                    try:
+                        myvg.remove_edge(path[i], path[i+1])
+                    except nx.exception.NetworkXError:
+                        pass
 
 
 class Gateway():
