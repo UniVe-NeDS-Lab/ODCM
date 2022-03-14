@@ -1,0 +1,4 @@
+cluster_size: 100
+area_radius: 2000
+density_nodes: 60
+area_center: 1681728,4849049
