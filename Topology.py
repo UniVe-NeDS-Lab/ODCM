@@ -1,6 +1,6 @@
 import networkx as nx
 
-from misc import copy_graph
+from misc import copy_graph, giant_component
 
 
 def get_topology_generator(gw_strategy_name: str, topology_strategy_name: str):
@@ -32,6 +32,21 @@ class SimpleBackhaul(Backhaul):
         for path in p.values():
             for i in range(len(path)-1):
                 self.phig.add_edge(path[i], path[i+1])
+
+
+class VisGraph(Backhaul):
+    def extract_graph(self):
+        self.phig = giant_component(self.vg)
+
+
+class K2EdgeAugmentedST(SimpleBackhaul):
+    def extract_graph(self):
+        super().extract_graph()
+        for src, dst in nx.k_edge_augmentation(self.phig,
+                                               k=2,
+                                               avail=giant_component(self.vg).edges(),
+                                               partial=True):
+            self.phig.add_edge(src, dst)
 
 
 class MultiGWBackhaul(Backhaul):

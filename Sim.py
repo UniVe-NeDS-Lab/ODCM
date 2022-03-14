@@ -24,7 +24,7 @@ def read_data(base_folder: str, dataset: str) -> tuple[gpd.GeoDataFrame, nx.Grap
     nodes = pd.read_csv(f"{base_folder}/{dataset}_2_2/best_p.csv", sep=',', header=0, names=['id', 'x', 'y'], dtype=int).set_index('id', drop=False)
     nodes = gpd.GeoDataFrame(nodes, geometry=gpd.points_from_xy(nodes.x, nodes.y))
     try:
-        heights = pd.read_csv(f"{base_folder}/{dataset}_2_2/heighsts.csv", sep=',', names=['id', 'h'], dtype={'id': int, 'h': float}).set_index('id')
+        heights = pd.read_csv(f"{base_folder}/{dataset}_2_2/heights.csv", sep=',', names=['id', 'h'], dtype={'id': int, 'h': float}).set_index('id')
         nodes = nodes.join(heights)
     except FileNotFoundError:
         print("heights.csv file not found, skipping it")
@@ -88,7 +88,6 @@ class Simulator():
         os.makedirs(base_dir, exist_ok=True)
         for i in range(self.n_clusters):
             mydf = self.mynodes[self.mynodes.cluster == i]
-            print(len(mydf))
             cluster_vg = copy_graph(self.graph.subgraph(mydf.id))
             TG_class = Topology.get_topology_generator(topo_strategy_name, gw_strategy_name)
             TG = TG_class(cluster_vg)
