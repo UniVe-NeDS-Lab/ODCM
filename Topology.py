@@ -11,7 +11,8 @@ def get_topology_generator(gw_strategy_name: str, topology_strategy_name: str):
     class TopologyGenerator(gw_strategy, topology_strategy):
         def __init__(self, vg):
             self.vg = vg
-        pass
+            self.phig = nx.Graph()
+            self.phig.add_nodes_from(self.vg.nodes(data=True))
 
     return TopologyGenerator
 
@@ -28,7 +29,6 @@ class SimpleBackhaul(Backhaul):
     def extract_graph(self):
         self.select_gateways(1)
         p = nx.shortest_path(self.vg, self.gateways[0])
-        self.phig = nx.Graph()
         for path in p.values():
             for i in range(len(path)-1):
                 self.phig.add_edge(path[i], path[i+1])
@@ -36,7 +36,7 @@ class SimpleBackhaul(Backhaul):
 
 class VisGraph(Backhaul):
     def extract_graph(self):
-        self.phig = giant_component(self.vg)
+        self.phig.add_edges_from(giant_component(self.vg).edges())
 
 
 class K2EdgeAugmentedST(SimpleBackhaul):
@@ -52,7 +52,6 @@ class K2EdgeAugmentedST(SimpleBackhaul):
 class MultiGWBackhaul(Backhaul):
     def extract_graph(self):
         self.select_gateways(3)
-        self.phig = nx.Graph()
         for gw in self.gateways[:3]:
             p = nx.shortest_path(self.vg, gw)
             for path in p.values():
@@ -63,7 +62,6 @@ class MultiGWBackhaul(Backhaul):
 class MultiGWBackhaulDisjoint(Backhaul):
     def extract_graph(self):
         self.select_gateways(3)
-        self.phig = nx.Graph()
         myvg = copy_graph(self.vg)
         for gw in self.gateways[:3]:
             p = nx.shortest_path(myvg, gw)
@@ -85,6 +83,8 @@ class Gateway():
         self.rank_gateways()
         sorted_gw = sorted(self.sorted_nodes.items(), key=lambda x: x[1], reverse=True)
         self.gateways = list(map(lambda x: x[0], sorted_gw[:n]))
+        for gw in self.gateways:
+            self.phig.nodes[gw]['type'] = 'gateway'
 
 
 class PageRankGW(Gateway):

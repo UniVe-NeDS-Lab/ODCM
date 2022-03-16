@@ -10,11 +10,9 @@ data = []
 for d in os.listdir(basedir):
     for f in os.listdir(f'{basedir}/{d}'):
         g = nx.read_graphml(f'{basedir}/{d}/{f}')
-        #key = f"{f}_{rdx}"
         measures = {}
         area, lamb, radius, x, y = d.split('_')
         time, random_seed, topo_strategy, gw_strategy, runid = f.split('.')[0].split('_')
-        #measures['key'] = key
         measures['run'] = runid
         measures['nodes'] = len(g)
         measures['edges'] = len(g.edges())
@@ -30,5 +28,5 @@ for d in os.listdir(basedir):
 
 df = pd.DataFrame(data)
 print(df)
-sns.relplot(data=df, x='topo_strategy', y='diameter', kind='line')
+sns.relplot(data=df, x='topo_strategy', y='diameter', kind='line', hue='area')
 plt.show()

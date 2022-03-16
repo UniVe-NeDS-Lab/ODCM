@@ -35,6 +35,7 @@ def read_data(base_folder: str, dataset: str) -> tuple[gpd.GeoDataFrame, nx.Grap
         nodetype=int,
         data=[('dist', float)]
     )
+    nx.set_node_attributes(graph, nodes.drop('geometry', axis=1).to_dict('index'))
     return nodes, graph
 
 
@@ -48,6 +49,7 @@ class Simulator():
         self.random_seed = args.seed
         self.random_state = np.random.RandomState(self.random_seed)
         self.nodes, self.graph = read_data(self.base_folder, self.dataset)
+        nx.set_node_attributes(self.graph, self.nodes.drop('geometry', axis=1).to_dict('index'))
         self.gw_strategy_name = args.gw_strategy
         self.topo_strategy_name = args.topo_strategy
 
