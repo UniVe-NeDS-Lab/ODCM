@@ -36,6 +36,13 @@ class SimpleBackhaul(Backhaul):
 
 class VisGraph(Backhaul):
     def extract_graph(self):
+        self.select_gateways(1)
+        self.phig.add_edges_from(giant_component(self.vg).edges())
+
+
+class VisGraphMultiGW(Backhaul):
+    def extract_graph(self):
+        self.select_gateways(3)
         self.phig.add_edges_from(giant_component(self.vg).edges())
 
 
