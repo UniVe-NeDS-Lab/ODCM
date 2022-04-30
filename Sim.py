@@ -1,27 +1,24 @@
-import pdb
-from typing import Type
 import configargparse
 import networkx as nx
 import Topology
 import numpy as np
 import pandas as pd
 import geopandas as gpd
-from shapely.geometry import Point
 from diskcache import Cache
-from k_means_constrained import KMeansConstrained
 import matplotlib.pyplot as plt
+import math as m
 import os
 import time
 import random
-import pdb
-import networkit as nk
 from sqlalchemy import create_engine
 import metis
+import tqdm
 from misc import copy_graph
+from collections import Counter
 # set the folder for the cache
 cache = Cache(".cache")
 
-DSN = "postgresql://dbreader:dBReader23@@34.76.18.0/TrueNets"
+DSN = "postgresql://dbreader:dBReader23#@34.76.18.0/TrueNets"
 
 
 @cache.memoize()
@@ -62,17 +59,14 @@ class Simulator():
     def __init__(self, args):
         self.base_folder = args.base_folder
         self.dataset = args.dataset.lower()
-        self.cluster_size = args.cluster_size
         engine = create_engine(DSN)
-        istat = gpd.read_postgis(f"""SELECT "PF1", geom, sez2011_tx::bigint as sez2011
-                                FROM istat_agcom
-                                WHERE lower("COMUNE") = '{self.dataset}'""", engine).set_index('sez2011', drop=False)
+        istat = gpd.read_postgis(f"""SELECT "PF1", geom, sez2011_tx::bigint as sez2011 FROM istat_agcom WHERE lower("COMUNE") = 'magliano in toscana'""", engine).set_index('sez2011', drop=False)
         self.random_seed = args.seed
         
         self.random_state = np.random.RandomState(self.random_seed)
         self.nodes, self.graph = read_data(self.base_folder, self.dataset)
         self.total_households = int(istat['PF1'].sum())
-        print(f"Total households : {self.total_households}")
+        #print(f"Total households : {self.total_households}")
         nx.set_node_attributes(self.graph, self.nodes.drop('geometry', axis=1).to_dict('index'))
         self.gw_strategy_name = args.gw_strategy
         self.topo_strategy_name = args.topo_strategy
@@ -81,73 +75,34 @@ class Simulator():
     def filter_nodes_households(self, pop_ratio):
         self.pop_ratio = pop_ratio
         target_households = int(self.total_households*self.pop_ratio)
-        self.mynodes = self.nodes.sample(target_households, weights=self.nodes.households, replace=True)
-        print(f"Got {len(self.mynodes)} buildings")
+        selected_nodes = self.nodes.sample(target_households, weights=self.nodes.households, replace=True).index
+        subscriptions = Counter(selected_nodes)
+        self.mynodes = self.nodes.loc[subscriptions.keys()]
+        self.mynodes['subscriptions'] = pd.Series(subscriptions)
+        assert(self.mynodes.subscriptions.sum() == target_households)
+        #print(f"Got {len(self.mynodes)} buildings")
         self.vg_filtered = nx.subgraph(self.graph, self.mynodes.index)
-        print(f"Graph has size {len(self.vg_filtered)}")
-        #We  have less nodes than 0.2*target_households because many nodes are repeated
-        #TODO: save the repeated nodes into the graph so that we can analyzie that later
+        #print(f"Graph has size {len(self.vg_filtered)}")
         self.cgraph = nx.subgraph(self.graph, max(nx.connected_components(self.vg_filtered), key=len))
-        print(f"Connected Graph has size {len(self.cgraph)}")
-
-    def clusterize_louvain(self):
-        #Cant set size
-        self.n_clusters = len(self.mynodes)//self.cluster_size
-        clusters = nx.community.louvain_communities(self.vg_filtered, resolution=1.1)
-        print([len(x) for x in clusters])
-
-    def clusterize_groupcentr(self):
-        self.n_clusters = len(self.mynodes)//self.cluster_size
-        nkg = nk.nxadapter.nx2nk(self.vg_filtered)
-        cent = nk.centrality.GroupCloseness(nkg, k=self.n_clusters)
-        cent.run()
-        nkgws = cent.groupMaxCloseness()
-        gateways = [list(self.vg_filtered.nodes())[nd] for nd in nkgws]
-        paths = nx.multi_source_dijkstra_path(self.vg_filtered, sources=gateways, weight='dist')
-        for node, path in paths.items():
-            self.mynodes.loc[node, 'cluster'] = gateways.index(path[0])
+        #print(f"Connected Graph has size {len(self.cgraph)}")
 
     def clusterize_metis(self, cluster_size):
-        self.n_clusters = len(self.mynodes)//cluster_size
+        self.cluster_size =  cluster_size
+        self.n_clusters = m.ceil(len(self.mynodes)/cluster_size)
+    
         #Transform weights to integers round(dist*100)
         nx.set_edge_attributes(self.vg_filtered, {e: round(wt * 1e2) for e, wt in nx.get_edge_attributes(self.vg_filtered, "dist").items()}, "int_dist")
+        nx.set_node_attributes(self.vg_filtered, self.mynodes.subscriptions.to_dict(),"subscriptions")
         #Apply metis algorithm for graph partitioning
         self.vg_filtered.graph['edge_weight_attr'] = 'int_dist'
-        edgecuts, clusters = metis.part_graph(self.vg_filtered, self.n_clusters)
-        self.mynodes['cluster'] = pd.Series({n:clusters[ndx] for ndx, n in enumerate(self.vg_filtered.nodes())})
-        
-
-    def clusterize_kmeans(self, cluster_size):
-        ##Spatial clustering
-        self.n_clusters = len(self.mynodes)//cluster_size
-        print(self.n_clusters)
-        self.kmeans = KMeansConstrained(
-            init="random",
-            n_clusters=self.n_clusters,
-            size_max=cluster_size*1.1,
-            size_min=cluster_size*0.9,
-            random_state=self.random_state
-        )
-        clusters = self.kmeans.fit_predict(self.mynodes[['x', 'y']])
-        self.mynodes['cluster'] = clusters
-        #Compute closeness for each node and find the highest in the spatial cluster
-        self.mynodes['closeness'] = 0
-        centrality = pd.Series(nx.centrality.closeness_centrality(self.vg_filtered))
-        gateways = []
-        for c in clusters:
-            try:
-                nodes = self.mynodes[self.mynodes.cluster == c]
-                gw = centrality[centrality.index.isin(nodes.index)].idxmax()
-                gateways.append(gw)
-            except ValueError:
-                print(f'{c} is empty')
-                #Filter out unconnected nodes
-                pass 
-        paths = nx.multi_source_dijkstra_path(self.vg_filtered, sources=gateways, weight='dist')
-        for node, path in paths.items():
-            self.mynodes.loc[node, 'cluster'] = gateways.index(path[0])
-            
-        
+        self.vg_filtered.graph['node_weight_attr'] = 'subscriptions'
+        if self.n_clusters == 1:
+            #Don't clusterize if I want only one cluster
+            self.mynodes['cluster'] = 0
+        else:
+            edgecuts, clusters = metis.part_graph(self.vg_filtered, self.n_clusters)
+            self.mynodes['cluster'] = pd.Series({n:clusters[ndx] for ndx, n in enumerate(self.vg_filtered.nodes())})
+               
 
     def plot_clusters(self):
         plt.figure(figsize=(20,20))
@@ -166,19 +121,8 @@ class Simulator():
         plt.tight_layout()
         exit(0)
 
-    def generate_topologies_old(self, gw_strategy_name, topo_strategy_name):
-        base_dir = f'results/{self.dataset}_{(self.density_nodes):.0f}_{self.area_radius:.0f}_{self.area_center[0]:.0f}_{self.area_center[1]:.0f}/'
-        os.makedirs(base_dir, exist_ok=True)
-        for i in range(self.n_clusters):
-            mydf = self.mynodes[self.mynodes.cluster == i]
-            cluster_vg = copy_graph(self.graph.subgraph(mydf.id))
-            TG_class = Topology.get_topology_generator(topo_strategy_name, gw_strategy_name)
-            TG = TG_class(cluster_vg)
-            TG.extract_graph()
-            TG.save_graph(f'{base_dir}/{time.time()*10:.0f}_{self.random_seed}_{topo_strategy_name}_{gw_strategy_name}_{i}.graphml.gz')
-
     def generate_topologies(self, gw_strategy_name, topo_strategy_name):
-        base_dir = f'results/{self.dataset}_{(self.pop_ratio*100):.0f}/'
+        base_dir = f'results/{self.dataset}_{(self.pop_ratio*100):.0f}_{self.cluster_size}/'
         os.makedirs(base_dir, exist_ok=True)
 
         TG_class = Topology.get_topology_generator(topo_strategy_name, gw_strategy_name, self.n_clusters)
@@ -199,15 +143,17 @@ def main():
     parser.add_argument('--seed', help='random seed', default=int(random.random()*100))
     args = parser.parse_args()
     s = Simulator(args)
+    pbar = tqdm.tqdm(total=len(args.cluster_size)*len(args.pop_ratio)*args.runs)
     for cs in args.cluster_size:
         for pr in args.pop_ratio:
             for run in range(args.runs):
                 s.filter_nodes_households(pr)
                 s.clusterize_metis(cs)
-                #s.plot_clusters()
                 for gs in args.gw_strategy:
                     for ts in args.topo_strategy:
                         s.generate_topologies(gs, ts)
+                pbar.update(1)
+    pbar.close()
             
         
 
