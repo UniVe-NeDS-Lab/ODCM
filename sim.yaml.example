@@ -1,8 +1,5 @@
-cluster_size: 100
-area_radius: 2000
-density_nodes: 60
-#area_center: 1681728,4849049
-base_folder: ../TrueNets_GPU/results/
-gw_strategy: BetweennessGW
-topo_strategy: [SimpleBackhaul, MultiGWBackhaul, MultiGWBackhaulDisjoint]
-runs: 10
+cluster_size: [200, 100, 50]
+subscribers_ratio: [0.2, 0.5, 1]
+base_folder: /home/gabriel/WORKS/TrueNets/Data/Italia
+runs: 50
+dsn: postgresql://dbreader:dBReader23#@34.76.18.0/TrueNets
