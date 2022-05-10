@@ -1,8 +1,8 @@
 import configargparse
 import networkx as nx
-import Topology
 import numpy as np
 import pandas as pd
+from Topology import Topology
 import geopandas as gpd
 from diskcache import Cache
 import matplotlib.pyplot as plt
@@ -15,6 +15,9 @@ import metis
 import tqdm
 from misc import copy_graph
 from collections import Counter
+import osmnx as ox
+import json
+ox.config(use_cache=True, log_console=False)
 # set the folder for the cache
 cache = Cache(".cache")
 
@@ -22,7 +25,7 @@ DSN = "postgresql://dbreader:dBReader23#@34.76.18.0/TrueNets"
 
 
 @cache.memoize()
-def read_data(base_folder: str, dataset: str) -> tuple[gpd.GeoDataFrame, nx.Graph]:
+def read_data(base_folder: str, dataset: str) -> tuple[gpd.GeoDataFrame, nx.Graph, nx.MultiGraph]:
     # Reads and join nodes and heights csv
     nodes = pd.read_csv(f"{base_folder}/vg/{dataset}/best_p.csv", sep=',', header=0, names=['id', 'x', 'y'], dtype=int).set_index('id', drop=False)
     nodes = gpd.GeoDataFrame(nodes, geometry=gpd.points_from_xy(nodes.x, nodes.y))
@@ -52,7 +55,15 @@ def read_data(base_folder: str, dataset: str) -> tuple[gpd.GeoDataFrame, nx.Grap
     )
     graph = nx.subgraph(graph, nodes.index)
     nx.set_node_attributes(graph, nodes.drop('geometry', axis=1).to_dict('index'))
-    return nodes, graph
+    
+    #Get road graph from OSM
+    if dataset == 'casciana terme':
+        dataset='casciana terme lari'
+    osmg = ox.graph_from_place(f'{dataset}, Italy')
+    posmg = ox.project_graph(osmg, 'EPSG:3003')
+    osm_road = ox.get_undirected(posmg)
+
+    return nodes, graph, osm_road
 
 
 class Simulator():
@@ -64,13 +75,15 @@ class Simulator():
         self.random_seed = args.seed
         
         self.random_state = np.random.RandomState(self.random_seed)
-        self.nodes, self.graph = read_data(self.base_folder, self.dataset)
+        self.nodes, self.graph, self.osm_road = read_data(self.base_folder, self.dataset)
         self.total_households = int(istat['PF1'].sum())
         #print(f"Total households : {self.total_households}")
         nx.set_node_attributes(self.graph, self.nodes.drop('geometry', axis=1).to_dict('index'))
         self.gw_strategy_name = args.gw_strategy
         self.topo_strategy_name = args.topo_strategy
         self.sub_area_nodes = self.nodes[self.nodes['households'] > 0]
+        with open('fiber_pop.json') as fr:
+            self.fiber_pop = json.load(fr)[self.dataset]
 
     def filter_nodes_households(self, pop_ratio):
         self.pop_ratio = pop_ratio
@@ -83,13 +96,12 @@ class Simulator():
         #print(f"Got {len(self.mynodes)} buildings")
         self.vg_filtered = nx.subgraph(self.graph, self.mynodes.index)
         #print(f"Graph has size {len(self.vg_filtered)}")
-        self.cgraph = nx.subgraph(self.graph, max(nx.connected_components(self.vg_filtered), key=len))
+        self.cgraph = self.vg_filtered# nx.subgraph(self.graph, max(nx.connected_components(self.vg_filtered), key=len))
         #print(f"Connected Graph has size {len(self.cgraph)}")
 
     def clusterize_metis(self, cluster_size):
         self.cluster_size =  cluster_size
-        self.n_clusters = m.ceil(len(self.mynodes)/cluster_size)
-    
+        self.n_clusters = m.ceil(self.mynodes.subscriptions.sum()/cluster_size)
         #Transform weights to integers round(dist*100)
         nx.set_edge_attributes(self.vg_filtered, {e: round(wt * 1e2) for e, wt in nx.get_edge_attributes(self.vg_filtered, "dist").items()}, "int_dist")
         nx.set_node_attributes(self.vg_filtered, self.mynodes.subscriptions.to_dict(),"subscriptions")
@@ -124,11 +136,10 @@ class Simulator():
     def generate_topologies(self, gw_strategy_name, topo_strategy_name):
         base_dir = f'results/{self.dataset}_{(self.pop_ratio*100):.0f}_{self.cluster_size}/'
         os.makedirs(base_dir, exist_ok=True)
-
-        TG_class = Topology.get_topology_generator(topo_strategy_name, gw_strategy_name, self.n_clusters)
-        TG = TG_class(self.graph, self.mynodes)
+        TG = Topology(self.graph, self.mynodes, self.n_clusters)
         TG.extract_graph()
-        TG.save_graph(f'{base_dir}/{time.time()*10:.0f}_{self.random_seed}_{topo_strategy_name}_{gw_strategy_name}.graphml.gz')
+        TG.fiber_backhaul(self.osm_road, self.fiber_pop)
+        TG.save_graph(f'{base_dir}/{time.time()*10:.0f}_{self.random_seed}_{topo_strategy_name}_{gw_strategy_name}')
 
 
 def main():
@@ -137,8 +148,8 @@ def main():
     parser.add_argument('-D', '--dataset', help='dataset')
     parser.add_argument('--cluster_size', type=int, action='append')
     parser.add_argument('--pop_ratio', type=float, action='append')
-    parser.add_argument('--gw_strategy', type=str, action='append')
-    parser.add_argument('--topo_strategy', type=str, action='append')
+    parser.add_argument('--gw_strategy', type=str)
+    parser.add_argument('--topo_strategy', type=str)
     parser.add_argument('--runs', type=int, default=1)
     parser.add_argument('--seed', help='random seed', default=int(random.random()*100))
     args = parser.parse_args()
@@ -149,9 +160,7 @@ def main():
             for run in range(args.runs):
                 s.filter_nodes_households(pr)
                 s.clusterize_metis(cs)
-                for gs in args.gw_strategy:
-                    for ts in args.topo_strategy:
-                        s.generate_topologies(gs, ts)
+                s.generate_topologies(args.gw_strategy, args.topo_strategy)
                 pbar.update(1)
     pbar.close()
             

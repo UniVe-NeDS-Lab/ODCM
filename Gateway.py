@@ -4,8 +4,7 @@ from misc import copy_graph, giant_component
 
 class Gateway():
     def rank_gateways(self):
-        self.sorted_nodes = {}
-        # Abstract function
+        self.sorted_nodes = nx.centrality.closeness_centrality(graph)
 
     def select_gateways(self, graph, n=1):
         self.rank_gateways(graph)
