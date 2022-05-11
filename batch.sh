@@ -1,6 +1,6 @@
 #!/bin/bash
 
-declare -a areas=("sambuca pistoiese" "villa basilica" "borgo a mozzano" "castel del piano" "santa fiora 23 " "magliano in toscana" "porcari" "roccalbegna" "fauglia" "semproniano")
+declare -a areas=("sambuca pistoiese" "villa basilica" "borgo a mozzano" "castel del piano" "santa fiora" "magliano in toscana" "porcari" "roccalbegna" "fauglia" "semproniano")
 
 for area in "${areas[@]}"; do
     echo $area
