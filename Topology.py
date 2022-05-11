@@ -26,7 +26,11 @@ class Topology():
         for i in range(self.n_clusters):
             mydf = self.nodes[self.nodes.cluster == i]
             filt_vg = self.vg.subgraph(mydf.id)
-            self.phig.add_nodes_from(filt_vg.nodes(data=True))
+            for n in filt_vg.nodes():
+                self.phig.add_node(n, x=filt_vg.nodes[n]['x'], 
+                                      id=filt_vg.nodes[n]['id'], 
+                                      y=filt_vg.nodes[n]['y'], 
+                                      subscriptions=filt_vg.nodes[n]['subscriptions'] )
             if len(mydf) == 0:
                 continue
             conn_vg = filt_vg.subgraph(max(nx.connected_components(filt_vg), key=len))

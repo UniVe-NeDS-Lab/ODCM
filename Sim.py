@@ -21,65 +21,70 @@ ox.config(use_cache=True, log_console=False)
 # set the folder for the cache
 cache = Cache(".cache")
 
-
 @cache.memoize()
-def read_data(base_folder: str, dataset: str) -> tuple[gpd.GeoDataFrame | pd.Series, nx.Graph, nx.MultiGraph]:
-    # Reads and join nodes and heights csv
-    nodes = pd.read_csv(f"{base_folder}/vg/{dataset}/best_p.csv", sep=',', header=0, names=['id', 'x', 'y'], dtype=int).set_index('id', drop=False)
-    nodes = gpd.GeoDataFrame(nodes, geometry=gpd.points_from_xy(nodes.x, nodes.y))
-    try:
-        heights = pd.read_csv(f"{base_folder}/{dataset}_2_2/heights.csv", sep=',', names=['id', 'h'], dtype={'id': int, 'h': float}).set_index('id')
-        nodes = nodes.join(heights)
-    except FileNotFoundError:
-        print("heights.csv file not found, skipping it")
-
-    hdf = pd.read_csv(f'{base_folder}/sociecon/{dataset}.csv',
-                      dtype={'id': int,
-                             'volume': float,
-                             'height': float,
-                             'area': float,
-                             'population': float,
-                             'households': float}
-                      ).set_index('id', drop=False)
-    nodes = nodes.join(hdf.drop('id', axis=1))  # Should drop id_rp
+def read_graphml(dataset: str) -> tuple[gpd.GeoDataFrame | pd.Series, nx.Graph, nx.MultiGraph]:
+    graph = nx.read_graphml(f"data/{dataset}.graphml.gz",node_type=int)
+    nodes = pd.DataFrame.from_dict(graph.nodes, orient='index')
     nodes = nodes[nodes.households > 0]
-    # Read graph from edgelist
-    graph = nx.read_edgelist(
-        f"{base_folder}/vg/{dataset}/distance.edgelist",
-        delimiter=" ",
-        nodetype=int,
-        data=[('dist', float)]
-    )
     graph = nx.subgraph(graph, nodes.index)
-    nx.set_node_attributes(graph, nodes.drop('geometry', axis=1).to_dict('index'))
-    
-    #Get road graph from OSM
     if dataset == 'casciana terme':
         #Casciana Terme changed name since last census, so OSM has a different name
         dataset='casciana terme lari'
     osmg = ox.graph_from_place(f'{dataset}, Italy')
     posmg = ox.project_graph(osmg, 'EPSG:3003')
     osm_road = ox.get_undirected(posmg)
+    return nodes, graph,osm_road
 
-    return nodes, graph, osm_road
+# @cache.memoize()
+# def read_data(base_folder: str, dataset: str) -> tuple[gpd.GeoDataFrame | pd.Series, nx.Graph, nx.MultiGraph]:
+#     # Reads and join nodes and heights csv
+#     nodes = pd.read_csv(f"{base_folder}/vg/{dataset}/best_p.csv", sep=',', header=0, names=['id', 'x', 'y'], dtype=int).set_index('id', drop=False)
+#     nodes = gpd.GeoDataFrame(nodes, geometry=gpd.points_from_xy(nodes.x, nodes.y))
+#     try:
+#         heights = pd.read_csv(f"{base_folder}/{dataset}_2_2/heights.csv", sep=',', names=['id', 'h'], dtype={'id': int, 'h': float}).set_index('id')
+#         nodes = nodes.join(heights)
+#     except FileNotFoundError:
+#         print("heights.csv file not found, skipping it")
+
+#     hdf = pd.read_csv(f'{base_folder}/sociecon/{dataset}.csv',
+#                       dtype={'id': int,
+#                              'volume': float,
+#                              'height': float,
+#                              'area': float,
+#                              'population': float,
+#                              'households': float}
+#                       ).set_index('id', drop=False)
+#     nodes = nodes.join(hdf.drop('id', axis=1))  # Should drop id_rp
+#     nodes = nodes[nodes.households > 0]
+#     # Read graph from edgelist
+#     graph = nx.read_edgelist(
+#         f"{base_folder}/vg/{dataset}/distance.edgelist",
+#         delimiter=" ",
+#         nodetype=int,
+#         data=[('dist', float)]
+#     )
+#     graph = nx.subgraph(graph, nodes.index)
+#     nx.set_node_attributes(graph, nodes.drop('geometry', axis=1).to_dict('index'))
+    
+#     #Get road graph from OSM
+#     if dataset == 'casciana terme':
+#         #Casciana Terme changed name since last census, so OSM has a different name
+#         dataset='casciana terme lari'
+#     osmg = ox.graph_from_place(f'{dataset}, Italy')
+#     posmg = ox.project_graph(osmg, 'EPSG:3003')
+#     osm_road = ox.get_undirected(posmg)
+
+#     return nodes, graph, osm_road
 
 
 class Simulator():
     def __init__(self, args):
-        self.base_folder = args.base_folder
         self.dataset = args.dataset.lower()
-        engine = create_engine(args.dsn)
-        istat = gpd.read_postgis(f"""SELECT "PF1", geom, sez2011_tx::bigint as sez2011 FROM istat_agcom WHERE lower("COMUNE") = 'magliano in toscana'""", engine).set_index('sez2011', drop=False)
         self.random_seed = args.seed
-        
         self.random_state = np.random.RandomState(self.random_seed)
-        self.nodes, self.graph, self.osm_road = read_data(self.base_folder, self.dataset)
-        self.total_households = int(istat['PF1'].sum())
-        #print(f"Total households : {self.total_households}")
-        nx.set_node_attributes(self.graph, self.nodes.drop('geometry', axis=1).to_dict('index'))
-        self.gw_strategy_name = args.gw_strategy
-        self.topo_strategy_name = args.topo_strategy
-        self.sub_area_nodes = self.nodes[self.nodes['households'] > 0]
+        self.nodes, self.graph, self.osm_road = read_graphml(self.dataset)
+        self.total_households = int(self.graph.graph['total_households'])
+        print(f"Total households : {self.total_households}")
         with open('fiber_pop.json') as fr:
             self.fiber_pop = json.load(fr)[self.dataset]
 
@@ -91,11 +96,8 @@ class Simulator():
         self.mynodes = self.nodes.loc[subscriptions.keys()]
         self.mynodes['subscriptions'] = pd.Series(subscriptions)
         assert(self.mynodes.subscriptions.sum() == target_households)
-        #print(f"Got {len(self.mynodes)} buildings")
         self.vg_filtered = nx.subgraph(self.graph, self.mynodes.index)
-        #print(f"Graph has size {len(self.vg_filtered)}")
         self.cgraph = self.vg_filtered# nx.subgraph(self.graph, max(nx.connected_components(self.vg_filtered), key=len))
-        #print(f"Connected Graph has size {len(self.cgraph)}")
 
     def clusterize_metis(self, cluster_size):
         self.cluster_size =  cluster_size
@@ -142,11 +144,9 @@ class Simulator():
 
 def main():
     parser = configargparse.ArgumentParser(description='Generate reliable backhaul infrastructures', default_config_files=['sim.yaml'])
-    parser.add_argument('--base_folder', help='path of the directory containing the visibility graphs')
     parser.add_argument('-D', '--dataset', help='dataset')
     parser.add_argument('--cluster_size', type=int, action='append')
     parser.add_argument('--subscribers_ratio', type=float, action='append')
-    parser.add_argument('--dsn', type=str)
     parser.add_argument('--runs', type=int, default=1)
     parser.add_argument('--seed', help='random seed', default=int(random.random()*100))
     args = parser.parse_args()
