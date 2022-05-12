@@ -10,6 +10,7 @@ The repository is organized as follows:
 - `sim.yaml.example` : the file containing the experimental variables
 - `results_110522/` : the folder containing the topologies generated for the WiOPT paper
 - `analysis/` : the folder containing the Jupyter notebook implementing the Cost Model and the analysis of the topologies.
+- `processed/`: the folder containing the processed results that are displayed in the paper's figures
 
 **How to replicate the results**
 The WBN topologies generated for our research paper are available in the folder `results_110522`. You can either analyze those by copying them into the `results` folder or generate new ones by following the instruction in the next section.
@@ -18,7 +19,7 @@ To analyze the topologies you can execute the Jupyter notebook : `analysis/analy
 
 **How to generate the WBN topologies**
 
-In order to generate the topologies, first you need to install the python dependencies:
+In order to generate the topologies, first, you need to install the python dependencies:
 
 ```
 pip -r requirements.txt
