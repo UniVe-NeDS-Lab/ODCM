@@ -5,15 +5,12 @@ import pandas as pd
 from Topology import Topology
 import geopandas as gpd
 from diskcache import Cache
-import matplotlib.pyplot as plt
 import math as m
 import os
 import time
 import random
-from sqlalchemy import create_engine
 import metis
 import tqdm
-from misc import copy_graph
 from collections import Counter
 import osmnx as ox
 import json
@@ -34,47 +31,6 @@ def read_graphml(dataset: str) -> tuple[gpd.GeoDataFrame | pd.Series, nx.Graph, 
     posmg = ox.project_graph(osmg, 'EPSG:3003')
     osm_road = ox.get_undirected(posmg)
     return nodes, graph,osm_road
-
-# @cache.memoize()
-# def read_data(base_folder: str, dataset: str) -> tuple[gpd.GeoDataFrame | pd.Series, nx.Graph, nx.MultiGraph]:
-#     # Reads and join nodes and heights csv
-#     nodes = pd.read_csv(f"{base_folder}/vg/{dataset}/best_p.csv", sep=',', header=0, names=['id', 'x', 'y'], dtype=int).set_index('id', drop=False)
-#     nodes = gpd.GeoDataFrame(nodes, geometry=gpd.points_from_xy(nodes.x, nodes.y))
-#     try:
-#         heights = pd.read_csv(f"{base_folder}/{dataset}_2_2/heights.csv", sep=',', names=['id', 'h'], dtype={'id': int, 'h': float}).set_index('id')
-#         nodes = nodes.join(heights)
-#     except FileNotFoundError:
-#         print("heights.csv file not found, skipping it")
-
-#     hdf = pd.read_csv(f'{base_folder}/sociecon/{dataset}.csv',
-#                       dtype={'id': int,
-#                              'volume': float,
-#                              'height': float,
-#                              'area': float,
-#                              'population': float,
-#                              'households': float}
-#                       ).set_index('id', drop=False)
-#     nodes = nodes.join(hdf.drop('id', axis=1))  # Should drop id_rp
-#     nodes = nodes[nodes.households > 0]
-#     # Read graph from edgelist
-#     graph = nx.read_edgelist(
-#         f"{base_folder}/vg/{dataset}/distance.edgelist",
-#         delimiter=" ",
-#         nodetype=int,
-#         data=[('dist', float)]
-#     )
-#     graph = nx.subgraph(graph, nodes.index)
-#     nx.set_node_attributes(graph, nodes.drop('geometry', axis=1).to_dict('index'))
-    
-#     #Get road graph from OSM
-#     if dataset == 'casciana terme':
-#         #Casciana Terme changed name since last census, so OSM has a different name
-#         dataset='casciana terme lari'
-#     osmg = ox.graph_from_place(f'{dataset}, Italy')
-#     posmg = ox.project_graph(osmg, 'EPSG:3003')
-#     osm_road = ox.get_undirected(posmg)
-
-#     return nodes, graph, osm_road
 
 
 class Simulator():
@@ -114,24 +70,6 @@ class Simulator():
         else:
             edgecuts, clusters = metis.part_graph(self.vg_filtered, self.n_clusters)
             self.mynodes['cluster'] = pd.Series({n:clusters[ndx] for ndx, n in enumerate(self.vg_filtered.nodes())})
-               
-
-    def plot_clusters(self):
-        plt.figure(figsize=(20,20))
-        for idx, c in enumerate(self.mynodes.cluster.unique()):
-            clnodes = self.mynodes[self.mynodes.cluster == c]
-            print(len(clnodes))
-            ax = plt.subplot(4,4,int(idx+1))
-            ax.scatter(clnodes.x, clnodes.y)
-            ax.set_title(f'cluster {c}')
-            ax.set_xticks([])
-            ax.set_yticks([])
-            ax.set_xlim([self.nodes.x.min(), self.nodes.x.max()])
-            ax.set_ylim([self.nodes.y.min(), self.nodes.y.max()])
-        # plt.scatter(self.kmeans.cluster_centers_[:, 0], self.kmeans.cluster_centers_[:, 1], color='black')
-        plt.savefig('results/clusters.pdf')
-        plt.tight_layout()
-        exit(0)
 
     def generate_topologies(self):
         base_dir = f'results/{self.dataset}_{(self.subscribers_ratio*100):.0f}_{self.cluster_size}/'

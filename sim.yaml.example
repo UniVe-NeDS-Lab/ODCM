@@ -1,3 +1,3 @@
 cluster_size: [200, 100, 50]
-subscribers_ratio: [0.2, 0.5, 1]
+subscribers_ratio: [0.25, 0.5, 1]
 runs: 50
