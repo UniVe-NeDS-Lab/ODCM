@@ -4,8 +4,9 @@ numpy
 pandas
 geopandas
 matplotlib
-sqlalchemy
 tqdm
 diskcache
 metis
-psycopg2-binary
+seaborn
+osmnx
+ipykernel
