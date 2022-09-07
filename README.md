@@ -1,6 +1,6 @@
 **Open-Data Cost Model**
 
-This repository contains the Open-Data Cost Model for Wireless Backhaul Networks associated with the homonym article submitted to the 18th International Conference on Network and Service Management.
+This repository contains the Open-Data Cost Model for Wireless Backhaul Networks associated with the homonym article submitted to the 18th International Conference on Network and Service Management, CNSM.
 
 The repository is organized as follows:
 
@@ -8,7 +8,7 @@ The repository is organized as follows:
 - `Sim.py `: The main file for the generations of the WBN topologies
 - `Topology.py` : the logic for the generation of the topology
 - `sim.yaml.example` : the file containing the experimental variables
-- `results_110522/` : the folder containing the topologies generated for the WiOPT paper
+- `results_110522/` : the folder containing the topologies generated for the CNSM paper
 - `analysis/` : the folder containing the Jupyter notebook implementing the Cost Model and the analysis of the topologies.
 - `processed/`: the folder containing the processed results that are displayed in the paper's figures
 
