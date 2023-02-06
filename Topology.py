@@ -25,7 +25,39 @@ class Topology():
         for gw in self.gateways:
             self.phig.nodes[gw]['type'] = 'gateway'
 
-    def extract_graph(self):
+    def select_gateway_pg(self, graph, n):
+        gbc, nodes = nx.centrality.prominent_group(graph, k=n)
+        self.gateways=nodes
+        for gw in self.gateways:
+            self.phig.nodes[gw]['type'] = 'gateway'
+
+    def group_closeness_weighted(self, graph, k): #n^(k+2)
+        import itertools
+        #TODO might be improved by using floyd_warshall algorithm to precompute all pair shortest path lengths
+        subs = {n:graph.nodes[n]['subscriptions'] for n in graph.nodes()}
+        pairs = itertools.combinations(graph.nodes(), k) #n^k
+        group_c = {}
+        for p in pairs:
+            path_dists = nx.multi_source_dijkstra_path_length(graph, p, weight='dist') #n^2 ?
+            try:
+                #weighted version
+                #group_c[p] = 1/sum([s*path_dists[n] for n,s in subs.items()])
+                
+                #unweighted version
+                group_c[p] = 1/sum([path_dists[n] for n,s in subs.items()])
+            except ZeroDivisionError:
+                print("Found 0 sum paths")
+                pass
+        return(max(group_c.items(), key=lambda x:x[1]))
+
+
+    def select_gateways_new(self, graph, n): 
+        g, s = self.group_closeness_weighted(graph, n)       
+        self.gateways=g
+        for gw in self.gateways:
+            self.phig.nodes[gw]['type'] = 'gateway'
+
+    def extract_graph(self, n_gws=1):
         for i in range(self.n_clusters):
             mydf = self.nodes[self.nodes.cluster == i]
             filt_vg = self.vg.subgraph(mydf.id)
@@ -38,7 +70,7 @@ class Topology():
                 continue
             conn_vg = filt_vg.subgraph(max(nx.connected_components(filt_vg), key=len))
             graph = copy_graph(conn_vg)
-            self.select_gateways(graph, 1)
+            self.select_gateways(graph, n_gws)
             paths = nx.multi_source_dijkstra_path(graph, sources=self.gateways, weight='dist')
             for node, path in paths.items():
                 for i in range(len(path)-1):
