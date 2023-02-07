@@ -18,16 +18,10 @@ class Topology():
         nx.write_graphml(self.phig, f'{file}.wireless.graphml.gz')
         nx.write_graphml(self.T, f'{file}.fiber.graphml.gz')
         
-    def select_gateways(self, graph, n=1):
+    def select_gateways_old(self, graph, n=1):
         sorted_nodes = nx.centrality.closeness_centrality(graph)
         sorted_gw = sorted(sorted_nodes.items(), key=lambda x: x[1], reverse=True)
         self.gateways = list(map(lambda x: x[0], sorted_gw[:n]))
-        for gw in self.gateways:
-            self.phig.nodes[gw]['type'] = 'gateway'
-
-    def select_gateway_pg(self, graph, n):
-        gbc, nodes = nx.centrality.prominent_group(graph, k=n)
-        self.gateways=nodes
         for gw in self.gateways:
             self.phig.nodes[gw]['type'] = 'gateway'
 
@@ -51,7 +45,7 @@ class Topology():
         return(max(group_c.items(), key=lambda x:x[1]))
 
 
-    def select_gateways_new(self, graph, n): 
+    def select_gateways(self, graph, n): 
         g, s = self.group_closeness_weighted(graph, n)       
         self.gateways=g
         for gw in self.gateways:
