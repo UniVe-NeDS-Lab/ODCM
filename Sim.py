@@ -71,11 +71,11 @@ class Simulator():
             edgecuts, clusters = metis.part_graph(self.vg_filtered, self.n_clusters)
             self.mynodes['cluster'] = pd.Series({n:clusters[ndx] for ndx, n in enumerate(self.vg_filtered.nodes())})
 
-    def generate_topologies(self):
-        base_dir = f'results/{self.dataset}_{(self.subscribers_ratio*100):.0f}_{self.cluster_size}/'
+    def generate_topologies(self, n_gws=1):
+        base_dir = f'results/{self.dataset}_{(self.subscribers_ratio*100):.0f}_{self.cluster_size}_{n_gws}/'
         os.makedirs(base_dir, exist_ok=True)
         TG = Topology(self.graph, self.mynodes, self.n_clusters)
-        TG.extract_graph()
+        TG.extract_graph(n_gws=n_gws)
         TG.fiber_backhaul(self.osm_road, self.fiber_pop)
         TG.save_graph(f'{base_dir}/{time.time()*10:.0f}_{self.random_seed}')
 
@@ -95,7 +95,8 @@ def main():
             for run in range(args.runs):
                 s.filter_nodes_households(sr)
                 s.clusterize_metis(cs)
-                s.generate_topologies()
+                for n in range(1,3):
+                    s.generate_topologies(n)
                 pbar.update(1)
     pbar.close()
             
