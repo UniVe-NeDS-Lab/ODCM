@@ -14,7 +14,9 @@ import tqdm
 from collections import Counter
 import osmnx as ox
 import json
-ox.config(use_cache=True, log_console=False)
+ox.settings.log_console=False
+ox.settings.use_cache=True
+#ox.config(use_cache=True, log_console=False)
 # set the folder for the cache
 cache = Cache(".cache")
 

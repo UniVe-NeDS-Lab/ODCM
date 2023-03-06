@@ -10,3 +10,4 @@ metis
 seaborn
 osmnx
 ipykernel
+scipy
