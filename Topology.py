@@ -88,6 +88,30 @@ class Topology():
                 import pdb; pdb.set_trace()
                 continue
         return(max(group_c.items(), key=lambda x:x[1]))
+    
+    def group_closeness_weighted_singh(self, graph, k):
+        #Fastest version of the group closeness that uses floyd_warshall algorithm 
+        # n^k+1
+        distances = nx.floyd_warshall(graph,  weight='dist')
+        subs = {n:graph.nodes[n]['subscriptions'] for n in graph.nodes()}
+        pairs = itertools.combinations(graph.nodes(), k) 
+        group_c = {}
+        for p in pairs: #n^k
+            #for each possible pair
+            sums = 0
+            
+            for n,s in subs.items(): #for each node times k
+                if n in p:
+                    continue
+                sums += s/(min([distances[src][n] for src in p])+1)
+            if sums!=0:
+                group_c[p] = sums+0.1*sum([subs[src] for src in p])
+            else:
+                print("Found 0 sum paths")
+                import pdb; pdb.set_trace()
+                continue
+        return(max(group_c.items(), key=lambda x:x[1]))
+
 
 
     def group_closeness_weighted(self, graph, k): #n^(k+2)
@@ -146,14 +170,13 @@ class Topology():
         nx.draw_networkx_edges(visgraph, pos=pos, edge_color=edge_col, alpha=edge_alpha, width=edge_width)
         plt.show()
     
-    def get_topo_dijkstra(self, graph, gws):
-        gw_nodes = []
+    def get_topo_dijkstra(self, graph, gws, gw_nodes):
         paths = nx.multi_source_dijkstra_path(graph, sources=gws, weight='dist')
         for node, path in paths.items():
             gw_nodes.append({'node': node, 
-                                'gateway': path[0], 
-                                'degree': nx.degree(graph, node),
-                                'attacched_gw': node != path[0] and path[1] == node})
+                             'gateway': path[0], 
+                             'degree': nx.degree(graph, node),
+                             'attacched_gw': node != path[0] and path[1] == node})
             for i in range(len(path)-1):
                 self.phig.add_edge(path[i], path[i+1], dist=graph[path[i]][path[i+1]]['dist'])
         gw_nodes = pd.DataFrame(gw_nodes)
@@ -203,7 +226,7 @@ class Topology():
                 self.phig.add_edge(src, dst, dist=g[src][dst]['dist'])
         return
 
-    def extract_graph(self, n_gws=1):
+    def extract_graph(self, n_gws, algo):
         for i in range(self.n_clusters):
             mydf = self.nodes[self.nodes.cluster == i]
             filt_vg = self.vg.subgraph(mydf.id)
@@ -224,8 +247,13 @@ class Topology():
                 return
             gws = self.select_gateways(conn_vg, n_gws)
             gw_nodes = []
-            
-            self.get_topo_espfp(conn_vg, gws, gw_nodes)       
+            match algo:
+                case 'dijkstra':
+                    self.get_topo_dijkstra(conn_vg, gws, gw_nodes)
+                case 'espfp':
+                    self.get_topo_espfp(conn_vg, gws, gw_nodes)   
+                case _:
+                    exit(0)    
             gw_nodes = pd.DataFrame(gw_nodes)
             for src, dst in self.two_edge_augmentation(self.phig, conn_vg, gw_nodes, gws):
                 self.phig.add_edge(src, dst, dist=self.vg[src][dst]['dist'])

@@ -95,11 +95,12 @@ class Simulator():
             edgecuts, clusters = metis.part_graph(self.vg_filtered, self.n_clusters)
             self.mynodes['cluster'] = pd.Series({n:clusters[ndx] for ndx, n in enumerate(self.vg_filtered.nodes())})
 
-    def generate_topologies(self, n_gws=1):
-        base_dir = f'results/{self.dataset}_{(self.subscribers_ratio*100):.0f}_{self.cluster_size}_{n_gws}/'
+    def generate_topologies(self, t):
+        base_dir = f'results/{self.dataset}_{(self.subscribers_ratio*100):.0f}_{self.cluster_size}_{t}/'
+        algo, n_gws = t.split('_')
         os.makedirs(base_dir, exist_ok=True)
         TG = Topology(self.graph, self.mynodes, self.n_clusters)
-        TG.extract_graph(n_gws=n_gws)
+        TG.extract_graph(n_gws=int(n_gws), algo=algo)
         TG.fiber_backhaul(self.osm_road, self.fiber_pop)
         TG.save_graph(f'{base_dir}/{time.time()*10:.0f}_{self.random_seed}')
 
@@ -109,6 +110,7 @@ def main():
     parser.add_argument('-D', '--dataset', help='dataset')
     parser.add_argument('--cluster_size', type=int, action='append')
     parser.add_argument('--subscribers_ratio', type=float, action='append')
+    parser.add_argument('--types', type=str, action='append')
     parser.add_argument('--runs', type=int, default=1)
     parser.add_argument('--seed', help='random seed', default=int(random.random()*100))
     args = parser.parse_args()
@@ -119,8 +121,8 @@ def main():
             for run in range(args.runs):
                 s.filter_nodes_households(sr)
                 s.clusterize_metis(cs)
-                for n in range(1,3):
-                    s.generate_topologies(n)
+                for t in args.types:
+                    s.generate_topologies(t)
                 pbar.update(1)
     pbar.close()
             
