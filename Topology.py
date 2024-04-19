@@ -52,12 +52,12 @@ def semicore_graph(g: nx.Graph) -> tuple[list, nx.Graph]:
     return core, g.subgraph(core)
 
 class Topology():
-    def __init__(self, vg, nodes, n_clusters):
+    def __init__(self, vg, nodes, n_clusters, dist=10000):
         self.vg = vg
         self.phig = nx.Graph()
         self.nodes = nodes
         self.n_clusters = n_clusters
-    
+
     def save_graph(self, file):
         nx.write_graphml(self.phig, f'{file}.wireless.graphml.gz')
         nx.write_graphml(self.T, f'{file}.fiber.graphml.gz')

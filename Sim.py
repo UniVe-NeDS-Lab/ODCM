@@ -47,7 +47,7 @@ def read_graphml(dataset: str) -> tuple[gpd.GeoDataFrame | pd.Series, nx.Graph, 
     graph = nx.read_graphml(f"data/{dataset}.graphml.gz",node_type=int)
     nodes = pd.DataFrame.from_dict(graph.nodes, orient='index')
     nodes = nodes[nodes.households > 0]
-    graph = nx.subgraph(graph, nodes.index)
+    graph = nx.subgraph(graph, nodes.index).copy()
     if dataset == 'casciana terme':
         #Casciana Terme changed name since last census, so OSM has a different name
         dataset='casciana terme lari'
@@ -63,10 +63,19 @@ class Simulator():
         self.random_seed = args.seed
         self.random_state = np.random.RandomState(self.random_seed)
         self.nodes, self.graph, self.osm_road = read_graphml(self.dataset)
+        self.prune_vg(dist=10000)
         self.total_households = int(self.graph.graph['total_households'])
         print(f"Total households : {self.total_households}")
         with open('fiber_pop.json') as fr:
             self.fiber_pop = json.load(fr)[self.dataset]
+    
+    def prune_vg(self, dist):
+        to_del = []
+        for e in self.graph.edges(data=True):
+            if e[2]['dist']>dist:
+                to_del.append((e[:2]))
+        self.graph.remove_edges_from(to_del)
+        print(f"Removed {len(to_del)} edges with length > {dist}")
 
     def filter_nodes_households(self, subscribers_ratio):
         self.subscribers_ratio = subscribers_ratio
@@ -122,7 +131,10 @@ def main():
                 s.filter_nodes_households(sr)
                 s.clusterize_metis(cs)
                 for t in args.types:
-                    s.generate_topologies(t)
+                    try:
+                        s.generate_topologies(t)
+                    except nx.exception.NetworkXUnfeasible as e:
+                        print(e)
                 pbar.update(1)
     pbar.close()
             
