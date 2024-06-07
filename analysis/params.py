@@ -1,6 +1,15 @@
+import numpy as np
+
 class Params:
     def __init__(self):
         self.init_cost_params()
+
+    def pl_fs(self, d):
+        return 20*np.log10(d/1000) + 20*np.log10(self.f_c) + 92.45
+
+    def pl_wifi(self, d):
+        #PL function taken from https://ieeexplore.ieee.org/document/995509
+        return  38+25*np.log10(d)
     
     def set_radio(self, type):
         if type == '802.11ad_pro':
@@ -24,6 +33,10 @@ class Params:
             self.mpant_bw = 90 #beamwidth of the mANTbox 19
             self.capex_costs['leaf_radio'] = 300
             self.capex_costs['mp_radio'] = 461
+            self.f_c = 70 #GHz
+            self.pl_function = self.pl_fs
+            
+            
 
         elif type == '802.11ac':
             self.speed_table = [
@@ -42,10 +55,13 @@ class Params:
             self.pt = 30 # (dBm) Maximum EIRP According to ETSI TR 102 555
             self.gr_m = 19 # (dBi) received gain for wave ap micro
             self.gr_d = 27 # (dBi) received gain for wave long range
-            self.max_bx = 360   #max ch capacity at mcs10
+            self.max_bx = 300   #max ch capacity at mcs10
             self.mpant_bw = 120 #beamwidth of the mANTbox 19
             self.capex_costs['leaf_radio'] = 100
             self.capex_costs['mp_radio'] = 200
+            self.f_c = 5.8 #GHz
+            self.pl_function = self.pl_wifi
+
 
 
     def init_cost_params(self):

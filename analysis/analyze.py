@@ -20,8 +20,8 @@ class odcm_analyze:
         self.p = Params()
         self.radio_type = radio_type
         self.p.set_radio(self.radio_type)
+        self.p.min_guaranteed_bws = [5,10,15,20]
 
-        self.p.min_guaranteed_bws = [20, 25, 30]
     def read_graph(self, f):  
         area, ratio, cluster_size, algo, n_gw, time, random_seed = re.split('[._/]', f)[4:11]
         cluster_size = int(cluster_size)

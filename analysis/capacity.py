@@ -11,8 +11,9 @@ class CapacityAnalysis():
     def __init__(self, params):
         self.p = params
 
-    def calc_ad_speed(self, dist, freq=70, ptp=False):
-        pl = 20*np.log10(dist/1000) + 20*np.log10(freq) + 92.45
+    def calc_capacity(self, dist, ptp=False):
+        pl = self.p.pl_function(dist)
+        
         if ptp:
             pr = self.p.pt + self.p.gr_d - pl
         else:
@@ -26,7 +27,7 @@ class CapacityAnalysis():
     def calc_maxbw(self, g, p):
         bottleneck = self.p.speed_table[0][2] #initalize to maximum value (400mbps)
         for i in range(len(p)-1):
-            speed = self.calc_ad_speed(g[p[i]][p[i+1]]['dist'])
+            speed = self.calc_capacity(g[p[i]][p[i+1]]['dist'])
             if speed<bottleneck:
                 bottleneck=speed
         return bottleneck
@@ -87,10 +88,10 @@ class CapacityAnalysis():
                 T.nodes[n]['uplink_capacity'] = np.nan
                 n_paths = 0
                 for neigh in T.predecessors(n):
-                    caps_downlink.append(self.calc_ad_speed(T[neigh][n]['dist']))
+                    caps_downlink.append(self.calc_capacity(T[neigh][n]['dist']))
                     n_paths += T[neigh][n]['paths']
                 for neigh in T.successors(n):
-                    caps_uplink.append(self.calc_ad_speed(w_g[n][neigh]['dist']))
+                    caps_uplink.append(self.calc_capacity(w_g[n][neigh]['dist']))
                 assert(len(caps_uplink)<=1)
                 if caps_uplink:
                     T.nodes[n]['uplink_capacity'] = caps_uplink[0]
