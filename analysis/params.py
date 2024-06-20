@@ -7,9 +7,19 @@ class Params:
     def pl_fs(self, d):
         return 20*np.log10(d/1000) + 20*np.log10(self.f_c) + 92.45
 
+    def pl_fs_custom(self, d, f, gal):
+        return 20*np.log10(d/1000) + 20*np.log10(f) + 92.45
+
+
     def pl_wifi(self, d):
         #PL function taken from https://ieeexplore.ieee.org/document/995509
-        return  38+25*np.log10(d)
+        pl = 38+25*np.log10(d)
+        return  pl
+    
+    def pl_wifi_rural(self, d):
+        #PL function taken from https://ieeexplore.ieee.org/document/995509
+        pl = 21.8+33*np.log10(d)
+        return  pl
     
     def set_radio(self, type):
         if type == '802.11ad_pro':

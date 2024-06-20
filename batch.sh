@@ -4,5 +4,5 @@ declare -a areas=("borgo a mozzano" "santa fiora" "magliano in toscana" "porcari
 
 for area in "${areas[@]}"; do
     echo $area
-    python Sim.py -D "$area"
+    python Sim.py -D "$area" --types dijkstra_1
 done

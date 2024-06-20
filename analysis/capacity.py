@@ -18,9 +18,9 @@ class CapacityAnalysis():
             pr = self.p.pt + self.p.gr_d - pl
         else:
             pr = self.p.pt + self.p.gr_m - pl
-        speed = 0
+        speed = self.p.speed_table[0][2]
         for i in range(len(self.p.speed_table)):
-            if pr<self.p.speed_table[i][0]:
+            if pr<=self.p.speed_table[i][0]:
                 speed = self.p.speed_table[i][2]
         return speed
 

@@ -125,16 +125,21 @@ class CostsAnalysis:
             fiber_trasport = self.p.opex_costs['transport_10']
         # if total_bw < 20:
         #     fiber_trasport = 2*self.p.opex_costs['transport_10']
-        elif total_bw < 100:
-            fiber_trasport = self.p.opex_costs['transport_100']
-        elif total_bw < 200:
-            fiber_trasport = 2*self.p.opex_costs['transport_100']
-        elif total_bw < 300:
-            fiber_trasport = 3*self.p.opex_costs['transport_100']
-        elif total_bw < 400:
-            fiber_trasport = 4*self.p.opex_costs['transport_100']
         else:
-            raise ValueError(f"Can't relay more than 200G : {total_bw}")
+            n_fibers = m.ceil(total_bw/100)
+            fiber_trasport = n_fibers*self.p.opex_costs['transport_100']
+        # elif total_bw < 100:
+        #     fiber_trasport = self.p.opex_costs['transport_100']
+        # elif total_bw < 200:
+        #     fiber_trasport = 2*self.p.opex_costs['transport_100']
+        # elif total_bw < 300:
+        #     fiber_trasport = 3*self.p.opex_costs['transport_100']
+        # elif total_bw < 400:
+        #     fiber_trasport = 4*self.p.opex_costs['transport_100']
+        # elif total_bw < 400:
+        #     fiber_trasport = 4*self.p.opex_costs['transport_100']
+        # else:
+        #     raise ValueError(f"Can't relay more than 200G : {total_bw}")
         return fiber_transit, fiber_trasport
 
     def calc_opex_maintenance(self, g, kind):
@@ -173,7 +178,7 @@ class CostsAnalysis:
 
 
     def get_network_capexes(self, graphs):
-        #data_summed = process_map(self._get_network_capex, graphs, max_workers=16)    
+        #data_summed = process_map(self._get_network_capex, graphs, max_workers=8)    
         data_summed = [self._get_network_capex(g) for g in tqdm(graphs)]     
         # self.edf = pd.DataFrame(data)
         self.sedf = pd.DataFrame(flatten(data_summed))
@@ -222,7 +227,7 @@ class CostsAnalysis:
 
 
     def get_network_opexes(self, graphs):
-        data = process_map(self._get_network_opex, graphs, max_workers=16, chunksize = 100) 
+        data = process_map(self._get_network_opex, graphs, max_workers=8, chunksize = 100) 
         self.opdf = pd.DataFrame(flatten(data))
 
     def _get_network_opex(self, graph):
@@ -267,6 +272,7 @@ class CostsAnalysis:
 
             #costs.index = costs.index/100
             to_csv_comment(costs, f'{csvfolder}/costs_1_dijkstra_{mgb}.csv')
+            to_csv_comment(self.sedf[(self.opdf.mgb==mgb)], f'{csvfolder}/capex_1_dijkstra_{mgb}.csv')
 
     def plot(self):
         pass

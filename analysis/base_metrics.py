@@ -27,7 +27,7 @@ def get_clusters(graph: nx.Graph):
     return sizes
 
 def compute_simple_metricses(graphs):
-    data = process_map(_compute_simple_metrics, graphs, max_workers=16, chunksize=100)
+    data = process_map(_compute_simple_metrics, graphs, max_workers=8, chunksize=100)
     df = pd.DataFrame(data) 
     return df
 
@@ -66,7 +66,7 @@ def compute_n_ants(graphs):
     with Pool(16) as p:
         data = p.map(_compute_n_ant, graphs)
     print("End n_ant compute")
-    #data = process_map(_compute_n_ant, graphs, max_workers=16, chunksize=100)
+    #data = process_map(_compute_n_ant, graphs, max_workers=8, chunksize=100)
     ant_df = pd.DataFrame(flatten(data)) 
     return ant_df
 
