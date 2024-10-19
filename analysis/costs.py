@@ -153,11 +153,11 @@ class CostsAnalysis:
         p_router_failure = (364*24)/self.p.mttf['router']
 
         n_tot_ants = sum([g.nodes[n]['n_ant'] for n in relays])
-            
-        gw_maintenance = p_router_failure * len(gws) * (self.p.mttr['router'] * self.p.opex_costs[kind] + self.p.capex_costs['gateway_router'])
-        router_maintenance = p_router_failure  * len(relays) * (self.p.mttr['router'] * self.p.opex_costs[kind] + self.p.capex_costs['relay_router'])
-        leafs_maintenance = p_leaf * p_radio_failure * len(leafs) * (self.p.mttr['radio'] * self.p.opex_costs['planned_maintenance'] + self.p.capex_costs['leaf_radio'])
-        relays_maintenance = p_relay * p_radio_failure * n_tot_ants * (self.p.mttr['radio'] * self.p.opex_costs[kind] + self.p.capex_costs['mp_radio'])
+        #Removing cost of devices as we already amortize it on 5y
+        gw_maintenance = p_router_failure * len(gws) * (self.p.mttr['router'] * self.p.opex_costs[kind])
+        router_maintenance = p_router_failure  * len(relays) * (self.p.mttr['router'] * self.p.opex_costs[kind])
+        leafs_maintenance = p_leaf * p_radio_failure * len(leafs) * (self.p.mttr['radio'] * self.p.opex_costs['planned_maintenance'])
+        relays_maintenance = p_relay * p_radio_failure * n_tot_ants * (self.p.mttr['radio'] * self.p.opex_costs[kind])
         return gw_maintenance + router_maintenance + leafs_maintenance + relays_maintenance
         
 
@@ -178,9 +178,14 @@ class CostsAnalysis:
 
 
     def get_network_capexes(self, graphs):
-        #data_summed = process_map(self._get_network_capex, graphs, max_workers=8)    
-        data_summed = [self._get_network_capex(g) for g in tqdm(graphs)]     
-        # self.edf = pd.DataFrame(data)
+        #data_summed = process_map(self._get_network_capex, graphs, max_workers=8)   
+        data = []
+        data_summed = []
+        for g in tqdm(graphs):
+            d_s, d = self._get_network_capex(g) 
+            data.append(d)
+            data_summed.append(d_s)
+        self.edf = pd.DataFrame(flatten(data))
         self.sedf = pd.DataFrame(flatten(data_summed))
 
     def _get_network_capex(self, graph):
@@ -193,7 +198,8 @@ class CostsAnalysis:
         cluster_size = int(cluster_size)
         ratio = int(ratio)
         costs = self.calc_cost_wireless(w_g, mgb)
-        costs.append(self.calc_cost_fiber(f_g))
+        #Take 1/3 of the cost of fiber to amortize its cost in 15y rather than 5
+        costs.append(self.calc_cost_fiber(f_g)/3)
     
         type_costs = ['router_cost', 'deploy', 'radio_cost', 'fiber_cost']
         total_cost = sum(costs)
@@ -205,24 +211,24 @@ class CostsAnalysis:
                             'n_gw': n_gw, 
                             'mgb': mgb})
 
-        # for i in range(4):
-        #     measures = {}
-        #     measures['nodes'] = len(w_g)
-        #     measures['n_gw'] = n_gw
-        #     measures['cost'] = costs[i]
-        #     measures['algo'] = algo
-        #     measures['cost_customer'] = costs[i]/n_subs
-        #     measures['5ymontlycostcustomer'] = costs[i]/n_subs/5/12
-        #     measures['type_cost'] = type_costs[i]
-        #     measures['area'] = area
-        #     measures['ratio'] = ratio
-        #     measures['cluster_size'] = cluster_size
-        #     measures['time'] = time
-        #     measures['seed'] = random_seed
-        #     measures['n_gw'] = n_gw
+        for i in range(4):
+            measures = {}
+            measures['nodes'] = len(w_g)
+            measures['n_gw'] = n_gw
+            measures['cost'] = costs[i]
+            measures['algo'] = algo
+            measures['cost_customer'] = costs[i]/n_subs
+            measures['5ymontlycostcustomer'] = costs[i]/n_subs/5/12
+            measures['type_cost'] = type_costs[i]
+            measures['area'] = area
+            measures['ratio'] = ratio
+            measures['cluster_size'] = cluster_size
+            measures['time'] = time
+            measures['seed'] = random_seed
+            measures['n_gw'] = n_gw
 
-        #     data.append(measures)
-        return data_summed
+            data.append(measures)
+        return data_summed, data
          
 
 
@@ -272,7 +278,7 @@ class CostsAnalysis:
 
             #costs.index = costs.index/100
             to_csv_comment(costs, f'{csvfolder}/costs_1_dijkstra_{mgb}.csv')
-            to_csv_comment(self.sedf[(self.opdf.mgb==mgb)], f'{csvfolder}/capex_1_dijkstra_{mgb}.csv')
+            to_csv_comment(self.edf, f'{csvfolder}/capex_1_dijkstra_{mgb}.csv')
 
     def plot(self):
         pass

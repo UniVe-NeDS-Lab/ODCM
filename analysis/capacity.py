@@ -54,6 +54,30 @@ class CapacityAnalysis():
         downlink = min(downlinks)
         return uplink, downlink, min(uplink, downlink)
 
+    def get_link_capacity(self, graph):
+        data = []
+        (p, mgb, w_g,f_g, n_subs)  = graph
+        area, ratio, cluster_size, algo, n_gw, time, random_seed = p
+        gws = [n for n in w_g if 'type' in w_g.nodes[n] and w_g.nodes[n]['type'] == 'gateway']
+        paths = nx.multi_source_dijkstra_path(w_g, gws, weight='dist')
+        T = nx.DiGraph()
+        T.add_nodes_from((i, w_g.nodes[i]) for i in w_g.nodes)
+        for src, p in paths.items():
+            p.reverse()
+            for i in range(len(p)-1):
+                T.add_edge(p[i], p[i+1], **w_g[p[i]][p[i+1]])
+
+        for s,t,d in T.edges(data=True):
+            data.append(self.calc_capacity(d['dist'], False))
+        return data
+
+
+    def get_link_capacities(self, graphs):
+        data = []
+        for idx, c in enumerate(list(chunks(graphs, 500))):
+            print(f"chunk {idx}")
+            data = data + process_map(self.get_link_capacity, c, max_workers=8, chunksize=10)
+        self.lcdf = pd.DataFrame(flatten(data))
 
     def get_network_capacities(self, graphs):
         data = []
@@ -144,5 +168,8 @@ class CapacityAnalysis():
         for m in self.bwdf.mgb.unique():
             bg = self.bwdf[self.bwdf.mgb == m].groupby(['bw_type', 'cluster_size','ratio' ]).bw.mean()
             bg.to_csv(f'{csvfolder}/bw_{m}.csv')
+
+    def save_link_capacities_csv(self, csvfolder):
+        self.lcdf.to_csv(f'{csvfolder}/lc.csv')
 
 

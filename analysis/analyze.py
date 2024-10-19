@@ -20,7 +20,7 @@ class odcm_analyze:
         self.p = Params()
         self.radio_type = radio_type
         self.p.set_radio(self.radio_type)
-        self.p.min_guaranteed_bws = [110, 130, 150]
+        self.p.min_guaranteed_bws = [50]
 
     def read_graph(self, f):  
         area, ratio, cluster_size, algo, n_gw, time, random_seed = re.split('[._/]', f)[4:11]
@@ -48,7 +48,7 @@ class odcm_analyze:
         return flatten(graphs)
 
     
-    def analyze(self, n=False):
+    def analyze(self, n=0):
         self.graphs = self.read_graphs_parallel()
         if n>0:
             print(f"Loaded {n} out of {len(self.graphs)} Topologies")
@@ -58,8 +58,8 @@ class odcm_analyze:
         print("Computing base metrics")
         bmdf = compute_simple_metricses(self.graphs)
         print(bmdf)
+        print(bmdf.subscriptions.mean())
         
-
         print("Computing costs")
         ca = CostsAnalysis(self.p)
         ca.get_network_capexes(self.graphs)
@@ -76,9 +76,12 @@ class odcm_analyze:
 
         print("Computing capacities")
         bc = CapacityAnalysis(self.p)
+        bc.get_link_capacities(self.graphs)
         bc.get_network_capacities(self.graphs)
         bc.plot_capacity(self.figdir)
         bc.save_capacity_csv(self.csvdir)
+        bc.save_link_capacities_csv(self.csvdir)
+        
 
 
 

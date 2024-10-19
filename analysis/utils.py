@@ -2,7 +2,7 @@ import os
 import pickle
 import networkx as nx
 from scipy.stats import t
-from line_profiler import LineProfiler
+# from line_profiler import LineProfiler
 
 
 def giant_component(g: nx.Graph) -> nx.Graph:
@@ -54,11 +54,11 @@ def cached(cachefile):
 
 
 
-profiler = LineProfiler()
+# profiler = LineProfiler()
 
-def profile(func):
-    def inner(*args, **kwargs):
-        profiler.add_function(func)
-        profiler.enable_by_count()
-        return func(*args, **kwargs)
-    return inner
+# def profile(func):
+#     def inner(*args, **kwargs):
+#         profiler.add_function(func)
+#         profiler.enable_by_count()
+#         return func(*args, **kwargs)
+#     return inner
