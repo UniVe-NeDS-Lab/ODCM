@@ -1,3 +1,25 @@
+# MIT License
+
+# Copyright (c) [2022] [Gabriele Gemmi gabriele.gemmi@unive.it]
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import configargparse
 import networkx as nx
 import numpy as np
@@ -14,7 +36,9 @@ import tqdm
 from collections import Counter
 import osmnx as ox
 import json
-ox.config(use_cache=True, log_console=False)
+ox.settings.log_console=False
+ox.settings.use_cache=True
+#ox.config(use_cache=True, log_console=False)
 # set the folder for the cache
 cache = Cache(".cache")
 
@@ -23,7 +47,7 @@ def read_graphml(dataset: str) -> tuple[gpd.GeoDataFrame | pd.Series, nx.Graph, 
     graph = nx.read_graphml(f"data/{dataset}.graphml.gz",node_type=int)
     nodes = pd.DataFrame.from_dict(graph.nodes, orient='index')
     nodes = nodes[nodes.households > 0]
-    graph = nx.subgraph(graph, nodes.index)
+    graph = nx.subgraph(graph, nodes.index).copy()
     if dataset == 'casciana terme':
         #Casciana Terme changed name since last census, so OSM has a different name
         dataset='casciana terme lari'
@@ -39,10 +63,19 @@ class Simulator():
         self.random_seed = args.seed
         self.random_state = np.random.RandomState(self.random_seed)
         self.nodes, self.graph, self.osm_road = read_graphml(self.dataset)
+        self.prune_vg(dist=10000)
         self.total_households = int(self.graph.graph['total_households'])
         print(f"Total households : {self.total_households}")
         with open('fiber_pop.json') as fr:
             self.fiber_pop = json.load(fr)[self.dataset]
+    
+    def prune_vg(self, dist):
+        to_del = []
+        for e in self.graph.edges(data=True):
+            if e[2]['dist']>dist:
+                to_del.append((e[:2]))
+        self.graph.remove_edges_from(to_del)
+        print(f"Removed {len(to_del)} edges with length > {dist}")
 
     def filter_nodes_households(self, subscribers_ratio):
         self.subscribers_ratio = subscribers_ratio
@@ -71,11 +104,12 @@ class Simulator():
             edgecuts, clusters = metis.part_graph(self.vg_filtered, self.n_clusters)
             self.mynodes['cluster'] = pd.Series({n:clusters[ndx] for ndx, n in enumerate(self.vg_filtered.nodes())})
 
-    def generate_topologies(self):
-        base_dir = f'results/{self.dataset}_{(self.subscribers_ratio*100):.0f}_{self.cluster_size}/'
+    def generate_topologies(self, t):
+        base_dir = f'results/{self.dataset}_{(self.subscribers_ratio*100):.0f}_{self.cluster_size}_{t}/'
+        algo, n_gws = t.split('_')
         os.makedirs(base_dir, exist_ok=True)
         TG = Topology(self.graph, self.mynodes, self.n_clusters)
-        TG.extract_graph()
+        TG.extract_graph(n_gws=int(n_gws), algo=algo)
         TG.fiber_backhaul(self.osm_road, self.fiber_pop)
         TG.save_graph(f'{base_dir}/{time.time()*10:.0f}_{self.random_seed}')
 
@@ -85,6 +119,7 @@ def main():
     parser.add_argument('-D', '--dataset', help='dataset')
     parser.add_argument('--cluster_size', type=int, action='append')
     parser.add_argument('--subscribers_ratio', type=float, action='append')
+    parser.add_argument('--types', type=str, action='append')
     parser.add_argument('--runs', type=int, default=1)
     parser.add_argument('--seed', help='random seed', default=int(random.random()*100))
     args = parser.parse_args()
@@ -95,7 +130,11 @@ def main():
             for run in range(args.runs):
                 s.filter_nodes_households(sr)
                 s.clusterize_metis(cs)
-                s.generate_topologies()
+                for t in args.types:
+                    try:
+                        s.generate_topologies(t)
+                    except nx.exception.NetworkXUnfeasible as e:
+                        print(e)
                 pbar.update(1)
     pbar.close()
             
