@@ -40,16 +40,9 @@ class CapacityAnalysis():
         for p_i in range(len(path)-1):
             p0 = path[p_i]
             p1 = path[p_i+1]
-            #print(p0, p1,  g[p0][p1]['paths'], g.nodes[p0]['paths'], g.nodes[p0]['uplink_capacity'], g.nodes[p0]['downlink_capacity'], len(list(g.predecessors(p0))), len(list(g.successors(p0))))
-            #print(p1, g.nodes[p1]['paths'], g.nodes[p1]['uplink_capacity'], g.nodes[p1]['downlink_capacity'], len(list(g.predecessors(p1))), len(list(g.successors(p1))))
-            
             downlinks.append(g.nodes[p1]['downlink_capacity']/g.nodes[p1]['paths'])
             uplinks.append(g.nodes[p0]['uplink_capacity']/g[p0][p1]['paths'])
-        # print("paths", [g.nodes[p]['paths'] for p in path])
-        # print("ants", [g.nodes[p]['n_ant'] for p in path])
-        # print("ul", [g.nodes[p]['uplink_capacity'] for p in path])
 
-        # print("dl", [g.nodes[p]['downlink_capacity'] for p in path])
         uplink = min(uplinks)
         downlink = min(downlinks)
         return uplink, downlink, min(uplink, downlink)

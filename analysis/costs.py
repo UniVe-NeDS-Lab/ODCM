@@ -197,13 +197,17 @@ class CostsAnalysis:
     
         cluster_size = int(cluster_size)
         ratio = int(ratio)
-        costs = self.calc_cost_wireless(w_g, mgb)
+        costs = []
+        wireless_cost = self.calc_cost_wireless(w_g, mgb)
+        costs += wireless_cost
         #Take 1/3 of the cost of fiber to amortize its cost in 15y rather than 5
         costs.append(self.calc_cost_fiber(f_g)/3)
     
         type_costs = ['router_cost', 'deploy', 'radio_cost', 'fiber_cost']
         total_cost = sum(costs)
+        sat_cost = sum(wireless_cost)
         data_summed.append({'capex': total_cost/n_subs/5/12,
+                            'capex_sat': sat_cost/n_subs/5/12,
                             'area': area, 
                             'cluster_size': cluster_size,
                             'ratio':ratio,
@@ -264,9 +268,12 @@ class CostsAnalysis:
     def save_csv_results(self, csvfolder):
         for mgb in self.opdf.mgb.unique():
             costs = self.opdf[(self.opdf.mgb==mgb)].groupby(['cluster_size', 'ratio'])[['fiber_cost', 'transport_cost', 'unplanned_cost', 'power_consumption']].agg(['mean', ci])
-            capex = self.sedf[(self.opdf.mgb==mgb)].groupby(['cluster_size', 'ratio'])['capex'].agg(['mean', ci])
-            costs['capex', 'mean'] = capex['mean']
-            costs['capex', 'ci'] = capex['ci']
+            capex = self.sedf[(self.opdf.mgb==mgb)].groupby(['cluster_size', 'ratio'])[['capex', 'capex_sat']].agg(['mean', ci])
+            capex.columns = ["_".join(a) for a in capex.columns.to_flat_index()]
+            costs['capex', 'mean'] = capex['capex_mean']
+            costs['capex', 'ci'] = capex['capex_ci']
+            costs['capex_sat', 'mean'] = capex['capex_sat_mean']
+            costs['capex_sat', 'ci'] = capex['capex_sat_ci']
             costs.columns = ["_".join(a) for a in costs.columns.to_flat_index()]
             costs['recurring'] = costs['fiber_cost_mean'] + costs['transport_cost_mean'] + costs['unplanned_cost_mean']
             costs['sum'] = costs['recurring'] + costs['capex_mean']
