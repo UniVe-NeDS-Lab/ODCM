@@ -87,8 +87,8 @@ class Params:
             self.gr_d = 46 # (dBi) received gain for wave long range
             self.max_bx = 1200   #max ch capacity at mcs10
             self.mpant_bw = 90 #beamwidth of the mANTbox 19
-            self.capex_costs['leaf_radio'] = 300
-            self.capex_costs['mp_radio'] = 461
+            self.capex_costs['leaf_radio'] = np.array([180, 300])
+            self.capex_costs['mp_radio'] = np.array([276, 461])
             self.f_c = 70 #GHz
             self.pl_function = self.pl_fs
             
@@ -113,30 +113,40 @@ class Params:
             self.gr_d = 27 # (dBi) received gain for wave long range
             self.max_bx = 300   #max ch capacity at mcs10
             self.mpant_bw = 120 #beamwidth of the mANTbox 19
-            self.capex_costs['leaf_radio'] = 100
-            self.capex_costs['mp_radio'] = 200
+            self.capex_costs['leaf_radio'] = np.array([60, 100])
+            self.capex_costs['mp_radio'] = np.array([120, 200])
             self.f_c = 5.8 #GHz
             self.pl_function = self.pl_wifi
 
 
 
     def init_cost_params(self):
+        #Fiber cost from report 4.47$ to 9.25$ per feet.
+        #https://fiberbroadband.org/wp-content/uploads/2024/01/Fiber-Deployment-Annual-Report-2023_FBA-and-Cartesian.pdf
+        # Multiply by  3.28084 to get meter
+        # 14.665$ to 30.034$ per meter
+        # converto to Eur using PPP
+        #1US$ equals 0.61 Eur
+        #Eur 8.946 to 18.512
+
+
         self.capex_costs = {
-            'gateway_deploy': 10000, #cost to deploy trellis + works + permits
-            'gateway_router': 5000, # 
-            'fiber_deploy': 6000, # per km (aerial)
-            'relay_router': 500, # 
-            'relay_deploy':  1000, # cost for trellis +  works 
-            'leaf_deploy': 300, #cost for roof installation
+            'gateway_deploy': np.array([10000, 10000]), #cost to deploy trellis + works + permits
+            'gateway_router': np.array([3000, 5000]), # 
+            'fiber_deploy': np.array([8946, 18512]),  #6000, # per km (aerial)
+            'relay_router': np.array([300, 500]), # 
+            'relay_deploy':  np.array([1000, 1000]), # cost for trellis +  works 
+            'leaf_deploy': np.array([300, 300]), #cost for roof installation
         }
 
-        #OpEx costs
+        #OpEx cost
         self.opex_costs = {
-            'bw': 1680, #Euros per year for 1Gbps  [Cerdà 2020] https://dsg.ac.upc.edu/sites/default/files/dsg/Guifi_net_Economics.pdf
-            'transport_10': 31200, # yearly price for transport of 10Gbps [xarxaoberta.cat]
-            'transport_100': 55200,  # yearly price for transport of 100Gbps [xarxaoberta.cat]
-            'planned_maintenance': 50, #euros per hour to repair
-            'unplanned_maintenance': 200 #euros per hour to repair
+            'bw': np.array([1260, 1680]), #Euros per year for 1Gbps  [Cerdà 2020] https://dsg.ac.upc.edu/sites/default/files/dsg/Guifi_net_Economics.pdf
+                                # range min is assuming 25% of traffic is peering max is assuming 0% is traffic
+            'transport_10': np.array([27456, 27456]), # yearly price for transport of 10Gbps [xarxaoberta.cat from 2024 updated]
+            'transport_100': np.array([55200, 55200]),  # yearly price for transport of 100Gbps [xarxaoberta.cat]
+            'planned_maintenance': np.array([50,50]), #euros per hour to repair
+            'unplanned_maintenance': np.array([200,200]) #euros per hour to repair
         }
 
 
@@ -147,7 +157,7 @@ class Params:
             'gateway_router': 200, # Watt
         }
 
-        self.cost_kw = 0.0003782 #Eur/W
+        self.cost_kw = np.array([0.00018 ,0.00033]) #Eur/W
         self.power_factor = 0.7
 
         #Reliability values

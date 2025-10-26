@@ -77,10 +77,10 @@ class CostsAnalysis:
         for n in g.nodes():
             #If it's unconnected it does not cost
             if nx.degree(g)[n] == 0:
-                g.nodes[n]['router_cost'] = 0
-                g.nodes[n]['deploy'] = 0
-                g.nodes[n]['fiber_cost'] = 0
-                g.nodes[n]['radio_cost'] = 0
+                g.nodes[n]['router_cost'] = np.array([0,0])
+                g.nodes[n]['deploy'] = np.array([0,0])
+                g.nodes[n]['fiber_cost'] = np.array([0,0])
+                g.nodes[n]['radio_cost'] = np.array([0,0])
                 continue
             #If it's a GW
             if g.nodes[n].get('type') == 'gateway':
@@ -92,12 +92,12 @@ class CostsAnalysis:
                 #print(g.nodes[n]['n_ant'])
                 g.nodes[n]['radio_cost'] = self.p.capex_costs['mp_radio'] * g.nodes[n]['n_ant']
             else:
-                g.nodes[n]['fiber_cost' ] = 0
+                g.nodes[n]['fiber_cost' ] = np.array([0,0])
                 if g.degree()[n] == 1:
                     #leaf node, no router
                     g.nodes[n]['radio_cost'] = self.p.capex_costs['leaf_radio']
                     g.nodes[n]['deploy'] = self.p.capex_costs['leaf_deploy']
-                    g.nodes[n]['router_cost'] = 0
+                    g.nodes[n]['router_cost'] = np.array([0,0])
                     g.nodes[n]['n_ant'] = 1
                 else:
                     #relay node
@@ -107,14 +107,13 @@ class CostsAnalysis:
                     g.nodes[n]['deploy'] = self.p.capex_costs['relay_deploy']
                     g.nodes[n]['router_cost'] = self.p.capex_costs['relay_router']
             
-            
+        
+
         router_cost = sum([g.nodes[n]['router_cost'] for n in g.nodes()])
         deploy = sum([g.nodes[n]['deploy'] for n in g.nodes()])
         radio_cost = sum([g.nodes[n]['radio_cost'] for n in g.nodes()])
-
         return [router_cost, deploy, radio_cost]
-    
-
+        
 
 
     def calc_opex_fiber_network(self, g, mgb):
@@ -168,7 +167,6 @@ class CostsAnalysis:
         gws = [n for n in g if 'type' in g.nodes[n] and g.nodes[n]['type'] == 'gateway']
 
         n_tot_ants = sum([g.nodes[n]['n_ant'] for n in relays])
-            
         gw_consumption = self.p.power_consumption['gateway_router'] * len(gws) * 24* 365 * self.p.cost_kw * self.p.power_factor
         router_consumption = self.p.power_consumption['relay_router']  * 24* 365 * self.p.cost_kw * self.p.power_factor
         leafs_consumption = self.p.power_consumption['leaf_radio'] * len(leafs) * 24* 365 * self.p.cost_kw * self.p.power_factor
@@ -251,7 +249,6 @@ class CostsAnalysis:
         planned_maint = self.calc_opex_maintenance(w_g, 'planned_maintenance')
         unplanned_maint = self.calc_opex_maintenance(w_g, 'unplanned_maintenance')
         power_consumpt = self.calc_power_consumption(w_g)
-
         data.append({'fiber_cost': fiber_cost/n_subs/12,
                     'algo': algo,
                     'transport_cost': transport_cost/n_subs/12,
@@ -266,17 +263,27 @@ class CostsAnalysis:
 
 
     def save_csv_results(self, csvfolder):
+        def get_min(x):
+            return x.apply(lambda arr: arr[0]).mean()  # Get first element (min)
+    
+        def get_max(x):
+            return x.apply(lambda arr: arr[1]).mean()  # Get second element (max)
+    
         for mgb in self.opdf.mgb.unique():
-            costs = self.opdf[(self.opdf.mgb==mgb)].groupby(['cluster_size', 'ratio'])[['fiber_cost', 'transport_cost', 'unplanned_cost', 'power_consumption']].agg(['mean', ci])
-            capex = self.sedf[(self.opdf.mgb==mgb)].groupby(['cluster_size', 'ratio'])[['capex', 'capex_sat']].agg(['mean', ci])
+            costs = self.opdf[(self.opdf.mgb==mgb)].groupby(['cluster_size', 'ratio'])[['fiber_cost', 'transport_cost', 'unplanned_cost', 'power_consumption']].agg([get_min, get_max])
+            capex = self.sedf[(self.opdf.mgb==mgb)].groupby(['cluster_size', 'ratio'])[['capex', 'capex_sat']].agg([get_min, get_max])
             capex.columns = ["_".join(a) for a in capex.columns.to_flat_index()]
-            costs['capex', 'mean'] = capex['capex_mean']
-            costs['capex', 'ci'] = capex['capex_ci']
-            costs['capex_sat', 'mean'] = capex['capex_sat_mean']
-            costs['capex_sat', 'ci'] = capex['capex_sat_ci']
+
+            costs['capex', 'min'] = capex['capex_get_min']
+            costs['capex', 'max'] = capex['capex_get_max']
+            costs['capex_sat', 'min'] = capex['capex_sat_get_min']
+            costs['capex_sat', 'max'] = capex['capex_sat_get_max']
+            
             costs.columns = ["_".join(a) for a in costs.columns.to_flat_index()]
-            costs['recurring'] = costs['fiber_cost_mean'] + costs['transport_cost_mean'] + costs['unplanned_cost_mean']
-            costs['sum'] = costs['recurring'] + costs['capex_mean']
+            costs['recurring_min'] = costs['fiber_cost_get_min'] + costs['transport_cost_get_min'] + costs['unplanned_cost_get_min'] + costs['power_consumption_get_min']
+            costs['recurring_max'] = costs['fiber_cost_get_max'] + costs['transport_cost_get_max'] + costs['unplanned_cost_get_max'] + costs['power_consumption_get_max']
+            costs['sum_min'] = costs['recurring_min'] + costs['capex_min']
+            costs['sum_max'] = costs['recurring_max'] + costs['capex_max']
 
             pd.set_option('display.max_rows',None)
             pd.set_option('display.max_columns',None)
@@ -285,7 +292,22 @@ class CostsAnalysis:
 
             #costs.index = costs.index/100
             to_csv_comment(costs, f'{csvfolder}/costs_1_dijkstra_{mgb}.csv')
-            to_csv_comment(self.edf, f'{csvfolder}/capex_1_dijkstra_{mgb}.csv')
+            edf_processed = self.edf.copy()
+        
+            # Process each column with array values
+            array_columns = ['cost', 'cost_customer', '5ymontlycostcustomer']
+            
+            for col in array_columns:
+                # Extract min and max into separate columns
+                edf_processed[f'{col}_min'] = edf_processed[col].apply(lambda x: x[0])
+                edf_processed[f'{col}_max'] = edf_processed[col].apply(lambda x: x[1])
+                #edf_processed[f'{col}_mean'] = edf_processed[col].apply(lambda x: (x[0] + x[1])/2)
+                
+                # Drop the original array column to avoid confusion
+                edf_processed = edf_processed.drop(columns=[col])
+            
+            # Save the processed edf to CSV
+            to_csv_comment(edf_processed, f'{csvfolder}/capex_1_dijkstra_{mgb}.csv')
 
     def plot(self):
         pass

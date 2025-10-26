@@ -20,7 +20,7 @@ class odcm_analyze:
         self.p = Params()
         self.radio_type = radio_type
         self.p.set_radio(self.radio_type)
-        self.p.min_guaranteed_bws = [70, 90]
+        self.p.min_guaranteed_bws = [5]
 
     def read_graph(self, f):  
         area, ratio, cluster_size, algo, n_gw, time, random_seed = re.split('[._/]', f)[4:11]
@@ -40,7 +40,7 @@ class odcm_analyze:
         return  graphs
 
     #@cached("allgraphs.pickle")
-    def read_graphs_parallel(self):
+    def read_graphs_parallel(self, n):
         files = glob.glob(f'{self.basedir}/*/*.wireless.graphml.gz')
         print(f"Found {len(files)} graphs in {self.basedir}")
 
@@ -49,7 +49,7 @@ class odcm_analyze:
 
     
     def analyze(self, n=0):
-        self.graphs = self.read_graphs_parallel()
+        self.graphs = self.read_graphs_parallel(n)
         if n>0:
             print(f"Loaded {n} out of {len(self.graphs)} Topologies")
             self.graphs = self.graphs[:n]
@@ -90,5 +90,5 @@ if __name__ == "__main__":
     basedir = '../results'
     figdir = 'figures'
     csvdir = 'processed'
-    oa = odcm_analyze(basedir, figdir, csvdir, radio_type='802.11ad_pro')
+    oa = odcm_analyze(basedir, figdir, csvdir, radio_type='802.11ac')
     oa.analyze()
