@@ -1,0 +1,11 @@
+using Pkg
+Pkg.add("Genie")
+Pkg.add("MetaGraphs")
+Pkg.add("EzXML")
+Pkg.add("GraphIO")
+Pkg.add("JuMP")
+Pkg.add("Gurobi")
+Pkg.add("Graphs")
+Pkg.add("DataStructures")
+Pkg.add("PrettyPrint")
+Pkg.add("Profile")

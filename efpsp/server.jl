@@ -35,7 +35,7 @@ route("/espfp", method=POST) do
 end
 
 # Start the app!
-up(8888)
+up(8888, host="0.0.0.0", verbose=true)
 
 
 

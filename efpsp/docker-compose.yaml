@@ -1,0 +1,11 @@
+version: '3.0'
+
+services:
+  genie:
+    build: .
+    container_name: genie-app
+    network_mode: host
+    environment:
+      - GENIE_HOST=0.0.0.0
+      - GENIE_PORT=8888
+    command: julia-1.8.1/bin/julia -i server.jl
