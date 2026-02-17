@@ -1,6 +1,6 @@
 **Open-Data Cost Model**
 
-This repository contains the Open-Data Cost Model for Wireless Backhaul Networks associated with the homonym article submitted to the 18th International Conference on Network and Service Management, CNSM.
+This repository contains the Open-Data Cost Model for Wireless Backhaul Networks associated with the homonym article submitted to the 18th International Conference on Network and Service Management, CNSM and "Next-Generation Wireless Backhaul Design for Rural Areas," in IEEE Transactions on Network and Service Management, vol. 22, no. 5, pp. 3921-3932, Oct. 2025.
 
 The repository is organized as follows:
 
